@@ -1,16 +1,24 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
-import { Repository } from 'typeorm';
+import { Not, Repository } from 'typeorm';
 import { Role } from './enums/role.enum';
 import { User } from './entities/user.entity';
 
 export interface CreateUserInput {
   nombre: string;
-  telefono: string;
+  telefono?: string;
   correo: string;
   contrasena: string;
   rol: Role;
+}
+
+export interface UpdateUserInput {
+  nombre?: string;
+  telefono?: string;
+  correo?: string;
+  contrasena?: string;
+  rol?: Role;
 }
 
 @Injectable()
@@ -30,19 +38,101 @@ export class UsersService {
 
   findByCorreoOrTelefono(
     correo: string,
-    telefono: string,
+    telefono?: string,
   ): Promise<User | null> {
-    return this.usersRepository.findOne({
-      where: [{ correo }, { telefono }],
-    });
+    const where = telefono ? [{ correo }, { telefono }] : [{ correo }];
+    return this.usersRepository.findOne({ where });
   }
 
-  async create(data: CreateUserInput): Promise<User> {
+  findConflictExcludingId(
+    correo: string,
+    telefono: string | undefined,
+    excludeId: number,
+  ): Promise<User | null> {
+    const where = telefono
+      ? [
+          { correo, id: Not(excludeId) },
+          { telefono, id: Not(excludeId) },
+        ]
+      : [{ correo, id: Not(excludeId) }];
+    return this.usersRepository.findOne({ where });
+  }
+
+  async findAll() {
+    const users = await this.usersRepository.find({ order: { id: 'ASC' } });
+    return users.map((user) => this.toSafeUser(user));
+  }
+
+  async create(data: CreateUserInput) {
+    const exists = await this.findByCorreoOrTelefono(
+      data.correo,
+      data.telefono,
+    );
+    if (exists) {
+      throw new ConflictException(
+        data.telefono
+          ? 'Ya existe un usuario con ese correo o teléfono'
+          : 'Ya existe un usuario con ese correo',
+      );
+    }
     const hashedPassword = await bcrypt.hash(data.contrasena, 10);
     const user = this.usersRepository.create({
       ...data,
       contrasena: hashedPassword,
     });
-    return this.usersRepository.save(user);
+    const saved = await this.usersRepository.save(user);
+    return this.toSafeUser(saved);
+  }
+
+  async update(id: number, data: UpdateUserInput) {
+    const user = await this.findById(id);
+    if (!user) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    const correo = data.correo ?? user.correo;
+    const telefono =
+      data.telefono !== undefined ? data.telefono : (user.telefono ?? undefined);
+
+    if (data.correo || data.telefono !== undefined) {
+      const conflict = await this.findConflictExcludingId(
+        correo,
+        telefono,
+        id,
+      );
+      if (conflict) {
+        throw new ConflictException(
+          telefono
+            ? 'Ya existe un usuario con ese correo o teléfono'
+            : 'Ya existe un usuario con ese correo',
+        );
+      }
+    }
+
+    if (data.nombre !== undefined) user.nombre = data.nombre;
+    if (data.correo !== undefined) user.correo = data.correo;
+    if (data.telefono !== undefined) user.telefono = data.telefono || null;
+    if (data.rol !== undefined) user.rol = data.rol;
+    if (data.contrasena) {
+      user.contrasena = await bcrypt.hash(data.contrasena, 10);
+    }
+
+    const saved = await this.usersRepository.save(user);
+    return this.toSafeUser(saved);
+  }
+
+  async remove(id: number) {
+    const user = await this.findById(id);
+    if (!user) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+    const safeUser = this.toSafeUser(user);
+    await this.usersRepository.remove(user);
+    return safeUser;
+  }
+
+  private toSafeUser(user: User) {
+    const { contrasena: _password, ...safeUser } = user;
+    return safeUser;
   }
 }

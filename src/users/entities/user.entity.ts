@@ -17,8 +17,8 @@ export class User {
   nombre: string;
 
   @Index({ unique: true })
-  @Column({ type: 'varchar', length: 20 })
-  telefono: string;
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  telefono: string | null;
 
   @Index({ unique: true })
   @Column({ type: 'varchar', length: 150 })
