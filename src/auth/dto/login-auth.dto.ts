@@ -1,11 +1,11 @@
-import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
 
 export class LoginAuthDto {
   @IsEmail({}, { message: 'El correo no tiene un formato válido' })
   @IsNotEmpty({ message: 'El correo es obligatorio' })
-  correo: string;
+  email: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'La contraseña es obligatoria' })
-  contrasena: string;
+  @MinLength(6, { message: 'La contraseña debe tener al menos 6 caracteres' })
+  password: string;
 }

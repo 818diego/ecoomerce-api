@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
@@ -13,21 +14,27 @@ import { Role } from './enums/role.enum';
 import { User } from './entities/user.entity';
 
 export interface CreateUserInput {
-  nombre: string;
-  telefono?: string;
-  correo: string;
-  contrasena: string;
-  rol: Role;
-  activo?: boolean;
+  name: string;
+  phone?: string;
+  email: string;
+  password: string;
+  role: Role;
+  active?: boolean;
 }
 
 export interface UpdateUserInput {
-  nombre?: string;
-  telefono?: string;
-  correo?: string;
-  contrasena?: string;
-  rol?: Role;
-  activo?: boolean;
+  name?: string;
+  phone?: string;
+  email?: string;
+  password?: string;
+  role?: Role;
+  active?: boolean;
+}
+
+export interface UpdateProfileInput {
+  name?: string;
+  phone?: string;
+  email?: string;
 }
 
 @Injectable()
@@ -41,45 +48,50 @@ export class UsersService {
     return this.usersRepository.findOne({ where: { id } });
   }
 
-  findByEmail(correo: string): Promise<User | null> {
-    return this.usersRepository.findOne({ where: { correo } });
+  findByEmail(email: string): Promise<User | null> {
+    return this.usersRepository.findOne({ where: { email } });
   }
 
-  findByCorreoOrTelefono(
-    correo: string,
-    telefono?: string,
-  ): Promise<User | null> {
-    const where = telefono ? [{ correo }, { telefono }] : [{ correo }];
+  findByEmailOrPhone(email: string, phone?: string): Promise<User | null> {
+    const where = phone ? [{ email }, { phone }] : [{ email }];
     return this.usersRepository.findOne({ where });
   }
 
   findConflictExcludingId(
-    correo: string,
-    telefono: string | undefined,
+    email: string,
+    phone: string | undefined,
     excludeId: number,
   ): Promise<User | null> {
-    const where = telefono
+    const where = phone
       ? [
-          { correo, id: Not(excludeId) },
-          { telefono, id: Not(excludeId) },
+          { email, id: Not(excludeId) },
+          { phone, id: Not(excludeId) },
         ]
-      : [{ correo, id: Not(excludeId) }];
+      : [{ email, id: Not(excludeId) }];
     return this.usersRepository.findOne({ where });
   }
 
+  async findOne(id: number) {
+    const user = await this.findById(id);
+    if (!user) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+    return this.toSafeUser(user);
+  }
+
   async findAll(status?: UserStatusFilter) {
-    let activo: boolean | undefined;
+    let active: boolean | undefined;
     if (status !== undefined) {
-      if (status === UserStatusFilter.Activo) activo = true;
-      else if (status === UserStatusFilter.Inactivo) activo = false;
+      if (status === UserStatusFilter.Active) active = true;
+      else if (status === UserStatusFilter.Inactive) active = false;
       else {
         throw new BadRequestException(
-          'El parámetro status debe ser activo o inactivo',
+          'El parámetro status debe ser active o inactive',
         );
       }
     }
     const users = await this.usersRepository.find({
-      where: activo !== undefined ? { activo } : {},
+      where: active !== undefined ? { active } : {},
       order: { id: 'ASC' },
     });
     return users.map((user) => this.toSafeUser(user));
@@ -88,31 +100,48 @@ export class UsersService {
   async createUser(data: CreateUserDto) {
     return this.create({
       ...data,
-      rol: Role.Administrador,
-      activo: data.activo ?? true,
+      role: Role.Administrador,
+      active: data.active ?? true,
     });
   }
 
   async create(data: CreateUserInput) {
-    const exists = await this.findByCorreoOrTelefono(
-      data.correo,
-      data.telefono,
-    );
+    const exists = await this.findByEmailOrPhone(data.email, data.phone);
     if (exists) {
       throw new ConflictException(
-        data.telefono
+        data.phone
           ? 'Ya existe un usuario con ese correo o teléfono'
           : 'Ya existe un usuario con ese correo',
       );
     }
-    const hashedPassword = await bcrypt.hash(data.contrasena, 10);
+    const hashedPassword = await bcrypt.hash(data.password, 10);
     const user = this.usersRepository.create({
       ...data,
-      contrasena: hashedPassword,
-      activo: data.activo ?? true,
+      password: hashedPassword,
+      active: data.active ?? true,
     });
     const saved = await this.usersRepository.save(user);
     return this.toSafeUser(saved);
+  }
+
+  async updateProfile(id: number, data: UpdateProfileInput) {
+    return this.update(id, data);
+  }
+
+  async changePassword(
+    id: number,
+    currentPassword: string,
+    newPassword: string,
+  ) {
+    const user = await this.findById(id);
+    if (!user) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      throw new UnauthorizedException('La contraseña actual es incorrecta');
+    }
+    return this.update(id, { password: newPassword });
   }
 
   async update(id: number, data: UpdateUserInput) {
@@ -121,32 +150,28 @@ export class UsersService {
       throw new NotFoundException('Usuario no encontrado');
     }
 
-    const correo = data.correo ?? user.correo;
-    const telefono =
-      data.telefono !== undefined ? data.telefono : (user.telefono ?? undefined);
+    const email = data.email ?? user.email;
+    const phone =
+      data.phone !== undefined ? data.phone : (user.phone ?? undefined);
 
-    if (data.correo || data.telefono !== undefined) {
-      const conflict = await this.findConflictExcludingId(
-        correo,
-        telefono,
-        id,
-      );
+    if (data.email || data.phone !== undefined) {
+      const conflict = await this.findConflictExcludingId(email, phone, id);
       if (conflict) {
         throw new ConflictException(
-          telefono
+          phone
             ? 'Ya existe un usuario con ese correo o teléfono'
             : 'Ya existe un usuario con ese correo',
         );
       }
     }
 
-    if (data.nombre !== undefined) user.nombre = data.nombre;
-    if (data.correo !== undefined) user.correo = data.correo;
-    if (data.telefono !== undefined) user.telefono = data.telefono || null;
-    if (data.rol !== undefined) user.rol = data.rol;
-    if (data.activo !== undefined) user.activo = data.activo;
-    if (data.contrasena) {
-      user.contrasena = await bcrypt.hash(data.contrasena, 10);
+    if (data.name !== undefined) user.name = data.name;
+    if (data.email !== undefined) user.email = data.email;
+    if (data.phone !== undefined) user.phone = data.phone || null;
+    if (data.role !== undefined) user.role = data.role;
+    if (data.active !== undefined) user.active = data.active;
+    if (data.password) {
+      user.password = await bcrypt.hash(data.password, 10);
     }
 
     const saved = await this.usersRepository.save(user);
@@ -164,7 +189,7 @@ export class UsersService {
   }
 
   private toSafeUser(user: User) {
-    const { contrasena: _password, ...safeUser } = user;
+    const { password: _password, ...safeUser } = user;
     return safeUser;
   }
 }

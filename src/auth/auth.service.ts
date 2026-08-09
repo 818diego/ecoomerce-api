@@ -14,15 +14,15 @@ export class AuthService {
   ) {}
 
   async login(loginDto: LoginAuthDto) {
-    const user = await this.usersService.findByEmail(loginDto.correo);
+    const user = await this.usersService.findByEmail(loginDto.email);
     if (!user) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
-    const isMatch = await bcrypt.compare(loginDto.contrasena, user.contrasena);
+    const isMatch = await bcrypt.compare(loginDto.password, user.password);
     if (!isMatch) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
-    if (!user.activo) {
+    if (!user.active) {
       throw new UnauthorizedException('Usuario inactivo');
     }
     return this.buildAuthResponse(user);
@@ -31,10 +31,10 @@ export class AuthService {
   private buildAuthResponse(user: User) {
     const payload: JwtPayload = {
       sub: user.id,
-      correo: user.correo,
-      rol: user.rol,
+      email: user.email,
+      role: user.role,
     };
-    const { contrasena: _password, ...safeUser } = user;
+    const { password: _password, ...safeUser } = user;
     return {
       user: safeUser,
       access_token: this.jwtService.sign(payload),

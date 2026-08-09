@@ -11,26 +11,26 @@ import { Role } from '../enums/role.enum';
 export class UpdateUserDto {
   @IsOptional()
   @IsString()
-  nombre?: string;
+  name?: string;
 
   @IsOptional()
   @IsString()
-  telefono?: string;
+  phone?: string;
 
   @IsOptional()
   @IsEmail({}, { message: 'El correo no tiene un formato válido' })
-  correo?: string;
+  email?: string;
 
   @IsOptional()
   @IsString()
   @MinLength(6, { message: 'La contraseña debe tener al menos 6 caracteres' })
-  contrasena?: string;
+  password?: string;
 
   @IsOptional()
   @IsEnum(Role, { message: 'El rol debe ser administrador, manager o usuario' })
-  rol?: Role;
+  role?: Role;
 
   @IsOptional()
   @IsBoolean({ message: 'El estado activo debe ser true o false' })
-  activo?: boolean;
+  active?: boolean;
 }

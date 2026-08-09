@@ -14,28 +14,28 @@ export class User {
   id: number;
 
   @Column({ type: 'varchar', length: 100 })
-  nombre: string;
+  name: string;
 
   @Index({ unique: true })
   @Column({ type: 'varchar', length: 20, nullable: true })
-  telefono: string | null;
+  phone: string | null;
 
   @Index({ unique: true })
   @Column({ type: 'varchar', length: 150 })
-  correo: string;
+  email: string;
 
   @Column({ type: 'varchar', length: 255 })
-  contrasena: string;
+  password: string;
 
   @Column({
     type: 'enum',
     enum: Role,
     default: Role.Usuario,
   })
-  rol: Role;
+  role: Role;
 
   @Column({ type: 'boolean', default: true })
-  activo: boolean;
+  active: boolean;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
