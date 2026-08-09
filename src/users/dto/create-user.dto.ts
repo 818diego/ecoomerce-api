@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsEmail,
   IsEnum,
   IsNotEmpty,
@@ -28,4 +29,8 @@ export class CreateUserDto {
   @IsEnum(Role, { message: 'El rol debe ser administrador, manager o usuario' })
   @IsNotEmpty({ message: 'El rol es obligatorio' })
   rol: Role;
+
+  @IsOptional()
+  @IsBoolean({ message: 'El estado activo debe ser true o false' })
+  activo?: boolean;
 }

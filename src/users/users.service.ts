@@ -11,6 +11,7 @@ export interface CreateUserInput {
   correo: string;
   contrasena: string;
   rol: Role;
+  activo?: boolean;
 }
 
 export interface UpdateUserInput {
@@ -19,6 +20,7 @@ export interface UpdateUserInput {
   correo?: string;
   contrasena?: string;
   rol?: Role;
+  activo?: boolean;
 }
 
 @Injectable()
@@ -79,6 +81,7 @@ export class UsersService {
     const user = this.usersRepository.create({
       ...data,
       contrasena: hashedPassword,
+      activo: data.activo ?? true,
     });
     const saved = await this.usersRepository.save(user);
     return this.toSafeUser(saved);
@@ -113,6 +116,7 @@ export class UsersService {
     if (data.correo !== undefined) user.correo = data.correo;
     if (data.telefono !== undefined) user.telefono = data.telefono || null;
     if (data.rol !== undefined) user.rol = data.rol;
+    if (data.activo !== undefined) user.activo = data.activo;
     if (data.contrasena) {
       user.contrasena = await bcrypt.hash(data.contrasena, 10);
     }

@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsEmail,
   IsEnum,
   IsOptional,
@@ -28,4 +29,8 @@ export class UpdateUserDto {
   @IsOptional()
   @IsEnum(Role, { message: 'El rol debe ser administrador, manager o usuario' })
   rol?: Role;
+
+  @IsOptional()
+  @IsBoolean({ message: 'El estado activo debe ser true o false' })
+  activo?: boolean;
 }

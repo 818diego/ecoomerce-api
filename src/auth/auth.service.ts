@@ -22,6 +22,9 @@ export class AuthService {
     if (!isMatch) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
+    if (!user.activo) {
+      throw new UnauthorizedException('Usuario inactivo');
+    }
     return this.buildAuthResponse(user);
   }
 
