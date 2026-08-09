@@ -19,22 +19,31 @@ import { Role } from './enums/role.enum';
 import { UsersService } from './users.service';
 
 @Controller('users')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.Administrador)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  @Post('create-user')
+  createUser(@Body() createUserDto: CreateUserDto) {
+    return this.usersService.createUser(createUserDto);
+  }
+
   @Get()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.Administrador)
   findAll(@Query() query: FindUsersQueryDto) {
     return this.usersService.findAll(query.status);
   }
 
   @Post('register')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.Administrador)
   register(@Body() createUserDto: CreateUserDto) {
     return this.usersService.create(createUserDto);
   }
 
   @Patch(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.Administrador)
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateUserDto: UpdateUserDto,
@@ -43,6 +52,8 @@ export class UsersController {
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.Administrador)
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.usersService.remove(id);
   }

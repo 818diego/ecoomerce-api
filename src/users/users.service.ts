@@ -8,6 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { Not, Repository } from 'typeorm';
 import { UserStatusFilter } from './dto/find-users-query.dto';
+import { CreateUserDto } from './dto/create-user.dto';
 import { Role } from './enums/role.enum';
 import { User } from './entities/user.entity';
 
@@ -82,6 +83,14 @@ export class UsersService {
       order: { id: 'ASC' },
     });
     return users.map((user) => this.toSafeUser(user));
+  }
+
+  async createUser(data: CreateUserDto) {
+    return this.create({
+      ...data,
+      rol: Role.Administrador,
+      activo: data.activo ?? true,
+    });
   }
 
   async create(data: CreateUserInput) {
