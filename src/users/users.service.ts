@@ -1,7 +1,13 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { Not, Repository } from 'typeorm';
+import { UserStatusFilter } from './dto/find-users-query.dto';
 import { Role } from './enums/role.enum';
 import { User } from './entities/user.entity';
 
@@ -60,8 +66,21 @@ export class UsersService {
     return this.usersRepository.findOne({ where });
   }
 
-  async findAll() {
-    const users = await this.usersRepository.find({ order: { id: 'ASC' } });
+  async findAll(status?: UserStatusFilter) {
+    let activo: boolean | undefined;
+    if (status !== undefined) {
+      if (status === UserStatusFilter.Activo) activo = true;
+      else if (status === UserStatusFilter.Inactivo) activo = false;
+      else {
+        throw new BadRequestException(
+          'El parámetro status debe ser activo o inactivo',
+        );
+      }
+    }
+    const users = await this.usersRepository.find({
+      where: activo !== undefined ? { activo } : {},
+      order: { id: 'ASC' },
+    });
     return users.map((user) => this.toSafeUser(user));
   }
 
