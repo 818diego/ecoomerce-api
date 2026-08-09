@@ -6,7 +6,7 @@ services:
     env_file:
       - .env
     ports:
-      - "127.0.0.1:3005:3005"
+      - "127.0.0.1:3011:3011"
     networks:
       - mariadb_default
 
