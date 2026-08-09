@@ -1,0 +1,27 @@
+name: Deploy with Docker
+on:
+  push:
+    tags:
+      - "v*"
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script_stop: true
+          script: |
+            cd /home/ecommerce/ecoomerce-api
+            git fetch --all --tags --force
+            git reset --hard
+            git checkout ${{ github.ref_name }}
+
+            # Reconstruye y reinicia el contenedor con la nueva versión
+            docker compose up -d --build
+
+            # Limpia imágenes viejas para no llenar disco
+            docker image prune -f
