@@ -7,6 +7,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -14,6 +15,7 @@ import { Roles, RolesGuard } from '../auth/guards/roles.guard';
 import { Role } from '../users/enums/role.enum';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
+import { FindCategoriesQueryDto } from './dto/find-categories-query.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 
 @Controller('categories')
@@ -23,6 +25,13 @@ export class CategoriesController {
   @Get()
   findAll() {
     return this.categoriesService.findAllPublic();
+  }
+
+  @Get('all')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.Administrador, Role.Manager)
+  getAll(@Query() query: FindCategoriesQueryDto) {
+    return this.categoriesService.findAll(query.status);
   }
 
   @Get(':id')

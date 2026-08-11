@@ -7,6 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Not, Repository } from 'typeorm';
 import { CreateCategoryDto } from './dto/create-category.dto';
+import { CategoryStatusFilter } from './dto/find-categories-query.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { Category } from './entities/category.entity';
 
@@ -33,6 +34,23 @@ export class CategoriesService {
   async findAllPublic() {
     return this.categoriesRepository.find({
       where: { active: true },
+      order: { name: 'ASC' },
+    });
+  }
+
+  async findAll(status?: CategoryStatusFilter) {
+    let active: boolean | undefined;
+    if (status !== undefined) {
+      if (status === CategoryStatusFilter.Active) active = true;
+      else if (status === CategoryStatusFilter.Inactive) active = false;
+      else {
+        throw new BadRequestException(
+          'El parámetro status debe ser active o inactive',
+        );
+      }
+    }
+    return this.categoriesRepository.find({
+      where: active !== undefined ? { active } : {},
       order: { name: 'ASC' },
     });
   }
