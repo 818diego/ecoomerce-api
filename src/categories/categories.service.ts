@@ -112,7 +112,19 @@ export class CategoriesService {
     if (data.description !== undefined) {
       category.description = data.description || null;
     }
-    if (data.active !== undefined) category.active = data.active;
+    if (data.active !== undefined) {
+      if (data.active === false) {
+        const activeProductsCount = await this.productsRepository.count({
+          where: { categoryId: id, active: true },
+        });
+        if (activeProductsCount > 0) {
+          throw new ConflictException(
+            'Existen productos activos en esta categoría',
+          );
+        }
+      }
+      category.active = data.active;
+    }
 
     return this.categoriesRepository.save(category);
   }

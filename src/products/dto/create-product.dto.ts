@@ -35,6 +35,7 @@ export class CreateProductDto {
 
   @IsOptional()
   @IsString()
+  @IsNotEmpty({ message: 'El SKU no puede estar vacío' })
   @MaxLength(50, { message: 'El SKU no puede superar 50 caracteres' })
   sku?: string;
 

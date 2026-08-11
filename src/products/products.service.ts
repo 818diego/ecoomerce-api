@@ -51,6 +51,7 @@ export class ProductsService {
     return this.productsRepository.find({
       where: {
         active: true,
+        category: { active: true },
         ...(categoryId !== undefined ? { categoryId } : {}),
       },
       relations: { category: true },
@@ -99,7 +100,7 @@ export class ProductsService {
 
   async findOne(id: number) {
     const product = await this.findById(id);
-    if (!product || !product.active) {
+    if (!product || !product.active || !product.category?.active) {
       throw new NotFoundException('Producto no encontrado');
     }
     return product;
@@ -125,8 +126,9 @@ export class ProductsService {
       throw new ConflictException('Ya existe un producto con ese nombre');
     }
 
-    if (data.sku) {
-      const skuConflict = await this.findSkuConflict(data.sku);
+    const sku = data.sku?.trim() || null;
+    if (sku) {
+      const skuConflict = await this.findSkuConflict(sku);
       if (skuConflict) {
         throw new ConflictException('Ya existe un producto con ese SKU');
       }
@@ -137,7 +139,7 @@ export class ProductsService {
       slug,
       description: data.description ?? null,
       price: data.price,
-      sku: data.sku ?? null,
+      sku,
       imageUrl: data.imageUrl ?? null,
       active: data.active ?? true,
       categoryId: data.categoryId,
