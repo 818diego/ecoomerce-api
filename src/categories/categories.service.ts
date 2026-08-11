@@ -6,16 +6,20 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Not, Repository } from 'typeorm';
+import { slugify } from '../common/utils/slugify';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { CategoryStatusFilter } from './dto/find-categories-query.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { Category } from './entities/category.entity';
+import { Product } from '../products/entities/product.entity';
 
 @Injectable()
 export class CategoriesService {
   constructor(
     @InjectRepository(Category)
     private readonly categoriesRepository: Repository<Category>,
+    @InjectRepository(Product)
+    private readonly productsRepository: Repository<Product>,
   ) {}
 
   findById(id: number): Promise<Category | null> {
@@ -64,7 +68,7 @@ export class CategoriesService {
   }
 
   async create(data: CreateCategoryDto) {
-    const slug = this.slugify(data.name);
+    const slug = slugify(data.name);
     if (!slug) {
       throw new BadRequestException(
         'No se pudo generar un slug válido desde el nombre',
@@ -91,7 +95,7 @@ export class CategoriesService {
 
     let slug = category.slug;
     if (data.name !== undefined && data.name !== category.name) {
-      slug = this.slugify(data.name);
+      slug = slugify(data.name);
       if (!slug) {
         throw new BadRequestException(
           'No se pudo generar un slug válido desde el nombre',
@@ -118,20 +122,14 @@ export class CategoriesService {
     if (!category) {
       throw new NotFoundException('Categoría no encontrada');
     }
+    const productsCount = await this.productsRepository.count({
+      where: { categoryId: id },
+    });
+    if (productsCount > 0) {
+      throw new ConflictException('Existen productos en esta categoría');
+    }
     const removed = { ...category };
     await this.categoriesRepository.remove(category);
     return removed;
-  }
-
-  private slugify(value: string): string {
-    return value
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '');
   }
 }
