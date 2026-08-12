@@ -1,3 +1,4 @@
+import { Exclude } from 'class-transformer';
 import {
   Column,
   CreateDateColumn,
@@ -45,6 +46,7 @@ export class Product {
   @JoinColumn({ name: 'category_id' })
   category: Category;
 
+  @Exclude()
   @Column({ name: 'category_id' })
   categoryId: number;
 

@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import {
   IsBoolean,
   IsInt,
@@ -16,6 +17,7 @@ export class CreateProductDto {
   @MaxLength(150, { message: 'El nombre no puede superar 150 caracteres' })
   name: string;
 
+  @Type(() => Number)
   @IsNumber(
     { maxDecimalPlaces: 2 },
     { message: 'El precio debe ser un número válido' },
@@ -24,6 +26,7 @@ export class CreateProductDto {
   @Min(0, { message: 'El precio no puede ser negativo' })
   price: number;
 
+  @Type(() => Number)
   @IsInt({ message: 'El ID de categoría debe ser un número entero' })
   @IsNotEmpty({ message: 'La categoría es obligatoria' })
   @Min(1, { message: 'El ID de categoría debe ser mayor a 0' })

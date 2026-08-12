@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { instanceToPlain } from 'class-transformer';
 import { Not, Repository } from 'typeorm';
 import { Category } from '../categories/entities/category.entity';
 import { slugify } from '../common/utils/slugify';
@@ -64,7 +65,7 @@ export class ProductsService {
     });
 
     return {
-      data,
+      data: data.map((product) => instanceToPlain(product)),
       meta: {
         total,
         page: page ?? 1,
@@ -112,7 +113,7 @@ export class ProductsService {
     const [data, total] = await qb.getManyAndCount();
 
     return {
-      data,
+      data: data.map((product) => instanceToPlain(product)),
       meta: {
         total,
         page: page ?? 1,
@@ -166,7 +167,7 @@ export class ProductsService {
       sku,
       imageUrl: data.imageUrl ?? null,
       active: data.active ?? true,
-      categoryId: data.categoryId,
+      category,
     });
 
     const saved = await this.productsRepository.save(product);
@@ -186,7 +187,7 @@ export class ProductsService {
       if (!category || !category.active) {
         throw new NotFoundException('Categoría no encontrada');
       }
-      product.categoryId = data.categoryId;
+      product.category = category;
     }
 
     if (data.name !== undefined && data.name !== product.name) {
@@ -239,7 +240,7 @@ export class ProductsService {
     if (!product) {
       throw new NotFoundException('Producto no encontrado');
     }
-    const removed = { ...product };
+    const removed = instanceToPlain(product);
     await this.productsRepository.remove(product);
     return removed;
   }

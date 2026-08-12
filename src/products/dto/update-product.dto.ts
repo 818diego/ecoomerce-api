@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import {
   IsBoolean,
   IsInt,
@@ -18,15 +19,16 @@ export class UpdateProductDto {
   name?: string;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber(
     { maxDecimalPlaces: 2 },
     { message: 'El precio debe ser un número válido' },
   )
-  @IsNotEmpty({ message: 'El precio no puede estar vacío' })
   @Min(0, { message: 'El precio no puede ser negativo' })
   price?: number;
 
   @IsOptional()
+  @Type(() => Number)
   @IsInt({ message: 'El ID de categoría debe ser un número entero' })
   @Min(1, { message: 'El ID de categoría debe ser mayor a 0' })
   categoryId?: number;
