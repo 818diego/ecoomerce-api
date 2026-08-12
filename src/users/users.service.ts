@@ -106,10 +106,11 @@ export class UsersService {
   }
 
   async create(data: CreateUserInput) {
-    const exists = await this.findByEmailOrPhone(data.email, data.phone);
+    const phone = data.phone?.trim() || null;
+    const exists = await this.findByEmailOrPhone(data.email, phone || undefined);
     if (exists) {
       throw new ConflictException(
-        data.phone
+        phone
           ? 'Ya existe un usuario con ese correo o teléfono'
           : 'Ya existe un usuario con ese correo',
       );
@@ -117,6 +118,7 @@ export class UsersService {
     const hashedPassword = await bcrypt.hash(data.password, 10);
     const user = this.usersRepository.create({
       ...data,
+      phone,
       password: hashedPassword,
       active: data.active ?? true,
     });
@@ -152,10 +154,16 @@ export class UsersService {
 
     const email = data.email ?? user.email;
     const phone =
-      data.phone !== undefined ? data.phone : (user.phone ?? undefined);
+      data.phone !== undefined
+        ? data.phone?.trim() || null
+        : (user.phone ?? null);
 
     if (data.email || data.phone !== undefined) {
-      const conflict = await this.findConflictExcludingId(email, phone, id);
+      const conflict = await this.findConflictExcludingId(
+        email,
+        phone || undefined,
+        id,
+      );
       if (conflict) {
         throw new ConflictException(
           phone
@@ -167,7 +175,7 @@ export class UsersService {
 
     if (data.name !== undefined) user.name = data.name;
     if (data.email !== undefined) user.email = data.email;
-    if (data.phone !== undefined) user.phone = data.phone || null;
+    if (data.phone !== undefined) user.phone = phone;
     if (data.role !== undefined) user.role = data.role;
     if (data.active !== undefined) user.active = data.active;
     if (data.password) {

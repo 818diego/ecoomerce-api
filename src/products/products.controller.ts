@@ -17,25 +17,25 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { FindProductsQueryDto } from './dto/find-products-query.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductsService } from './products.service';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 
 @Controller('products')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Get()
-  findAll(@Query('categoryId', new ParseIntPipe({ optional: true })) categoryId?: number) {
-    return this.productsService.findAllPublic(categoryId);
+  findAll(
+    @Query() paginationQuery: PaginationQueryDto,
+    @Query('categoryId', new ParseIntPipe({ optional: true })) categoryId?: number,
+  ) {
+    return this.productsService.findAllPublic(paginationQuery, categoryId);
   }
 
   @Get('all')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.Administrador, Role.Manager)
   getAll(@Query() query: FindProductsQueryDto) {
-    return this.productsService.findAll(
-      query.status,
-      query.categoryId,
-      query.search,
-    );
+    return this.productsService.findAll(query);
   }
 
   @Get(':id')

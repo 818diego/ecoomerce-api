@@ -9,9 +9,11 @@ import { Not, Repository } from 'typeorm';
 import { Category } from '../categories/entities/category.entity';
 import { slugify } from '../common/utils/slugify';
 import { CreateProductDto } from './dto/create-product.dto';
-import { ProductStatusFilter } from './dto/find-products-query.dto';
+import { FindProductsQueryDto, ProductStatusFilter } from './dto/find-products-query.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { Product } from './entities/product.entity';
+import { PaginatedResult } from '../common/interfaces/paginated-result.interface';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 
 @Injectable()
 export class ProductsService {
@@ -47,8 +49,9 @@ export class ProductsService {
     return this.productsRepository.findOne({ where });
   }
 
-  async findAllPublic(categoryId?: number) {
-    return this.productsRepository.find({
+  async findAllPublic(query: PaginationQueryDto, categoryId?: number) {
+    const { limit, skip, page } = query;
+    const [data, total] = await this.productsRepository.findAndCount({
       where: {
         active: true,
         category: { active: true },
@@ -56,14 +59,23 @@ export class ProductsService {
       },
       relations: { category: true },
       order: { name: 'ASC' },
+      take: limit,
+      skip: skip,
     });
+
+    return {
+      data,
+      meta: {
+        total,
+        page: page ?? 1,
+        lastPage: Math.ceil(total / (limit ?? 10)),
+        limit: limit ?? 10,
+      },
+    };
   }
 
-  async findAll(
-    status?: ProductStatusFilter,
-    categoryId?: number,
-    search?: string,
-  ) {
+  async findAll(query: FindProductsQueryDto) {
+    const { status, categoryId, search, limit, skip, page } = query;
     let active: boolean | undefined;
     if (status !== undefined) {
       if (status === ProductStatusFilter.Active) active = true;
@@ -95,7 +107,19 @@ export class ProductsService {
       );
     }
 
-    return qb.getMany();
+    qb.take(limit).skip(skip);
+
+    const [data, total] = await qb.getManyAndCount();
+
+    return {
+      data,
+      meta: {
+        total,
+        page: page ?? 1,
+        lastPage: Math.ceil(total / (limit ?? 10)),
+        limit: limit ?? 10,
+      },
+    };
   }
 
   async findOne(id: number) {

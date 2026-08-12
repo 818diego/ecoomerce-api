@@ -1,12 +1,13 @@
 import { Type } from 'class-transformer';
 import { IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 
 export enum ProductStatusFilter {
   Active = 'active',
   Inactive = 'inactive',
 }
 
-export class FindProductsQueryDto {
+export class FindProductsQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsEnum(ProductStatusFilter, {
     message: 'El status debe ser active o inactive',
