@@ -6,13 +6,16 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { instanceToPlain } from 'class-transformer';
-import { Not, Repository } from 'typeorm';
+import { DataSource, Not, Repository } from 'typeorm';
 import { Category } from '../categories/entities/category.entity';
 import { slugify } from '../common/utils/slugify';
 import { CreateProductDto } from './dto/create-product.dto';
 import { FindProductsQueryDto, ProductStatusFilter } from './dto/find-products-query.dto';
+import { StockMovementDto } from './dto/stock-movement.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { Product } from './entities/product.entity';
+import { StockMovement } from './entities/stock-movement.entity';
+import { StockMovementType } from './enums/stock-movement-type.enum';
 import { PaginatedResult } from '../common/interfaces/paginated-result.interface';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 
@@ -23,6 +26,9 @@ export class ProductsService {
     private readonly productsRepository: Repository<Product>,
     @InjectRepository(Category)
     private readonly categoriesRepository: Repository<Category>,
+    @InjectRepository(StockMovement)
+    private readonly stockMovementsRepository: Repository<StockMovement>,
+    private readonly dataSource: DataSource,
   ) {}
 
   findById(id: number): Promise<Product | null> {
@@ -167,6 +173,7 @@ export class ProductsService {
       sku,
       imageUrl: data.imageUrl ?? null,
       active: data.active ?? true,
+      stock: data.stock ?? 0,
       category,
     });
 
@@ -235,6 +242,109 @@ export class ProductsService {
     return this.findById(id);
   }
 
+  async findMovementsByProduct(id: number, query: PaginationQueryDto) {
+    const product = await this.findById(id);
+    if (!product) {
+      throw new NotFoundException('Producto no encontrado');
+    }
+
+    const { limit, skip, page } = query;
+    const [data, total] = await this.stockMovementsRepository.findAndCount({
+      where: { productId: id },
+      relations: { user: true },
+      order: { createdAt: 'DESC' },
+      take: limit,
+      skip,
+    });
+
+    return {
+      data: data.map((movement) => this.toSafeMovement(movement)),
+      meta: {
+        total,
+        page: page ?? 1,
+        lastPage: Math.ceil(total / (limit ?? 10)),
+        limit: limit ?? 10,
+      },
+    };
+  }
+
+  async registerStockMovement(
+    id: number,
+    data: StockMovementDto,
+    userId: number,
+  ) {
+    const product = await this.findById(id);
+    if (!product) {
+      throw new NotFoundException('Producto no encontrado');
+    }
+
+    const previousStock = product.stock;
+    let newStock: number;
+
+    switch (data.type) {
+      case StockMovementType.Entrada:
+        if (data.quantity <= 0) {
+          throw new BadRequestException(
+            'La cantidad de una entrada debe ser mayor a 0',
+          );
+        }
+        newStock = previousStock + data.quantity;
+        break;
+
+      case StockMovementType.Salida:
+        if (data.quantity <= 0) {
+          throw new BadRequestException(
+            'La cantidad de una salida debe ser mayor a 0',
+          );
+        }
+        if (previousStock < data.quantity) {
+          throw new BadRequestException(
+            'Stock insuficiente para realizar la salida',
+          );
+        }
+        newStock = previousStock - data.quantity;
+        break;
+
+      case StockMovementType.Ajuste:
+        newStock = data.quantity;
+        break;
+
+      default:
+        throw new BadRequestException('Tipo de movimiento no válido');
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      product.stock = newStock;
+      await manager.save(Product, product);
+
+      const movement = manager.create(StockMovement, {
+        productId: product.id,
+        userId,
+        type: data.type,
+        quantity: data.quantity,
+        previousStock,
+        newStock,
+        observations: data.observations?.trim() || null,
+      });
+      const savedMovement = await manager.save(StockMovement, movement);
+
+      const movementWithUser = await manager.findOne(StockMovement, {
+        where: { id: savedMovement.id },
+        relations: { user: true },
+      });
+
+      const updatedProduct = await manager.findOne(Product, {
+        where: { id },
+        relations: { category: true },
+      });
+
+      return {
+        product: instanceToPlain(updatedProduct),
+        movement: this.toSafeMovement(movementWithUser!),
+      };
+    });
+  }
+
   async remove(id: number) {
     const product = await this.findById(id);
     if (!product) {
@@ -243,5 +353,15 @@ export class ProductsService {
     const removed = instanceToPlain(product);
     await this.productsRepository.remove(product);
     return removed;
+  }
+
+  private toSafeMovement(movement: StockMovement) {
+    const { user, ...movementData } = movement;
+    return {
+      ...movementData,
+      user: user
+        ? { id: user.id, name: user.name, email: user.email }
+        : null,
+    };
   }
 }

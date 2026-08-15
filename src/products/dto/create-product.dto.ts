@@ -50,4 +50,10 @@ export class CreateProductDto {
   @IsOptional()
   @IsBoolean({ message: 'El estado activo debe ser true o false' })
   active?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'El stock debe ser un número entero' })
+  @Min(0, { message: 'El stock no puede ser negativo' })
+  stock?: number;
 }

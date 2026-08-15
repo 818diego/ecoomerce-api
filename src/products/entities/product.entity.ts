@@ -39,6 +39,9 @@ export class Product {
   @Column({ type: 'boolean', default: true })
   active: boolean;
 
+  @Column({ type: 'int', default: 0 })
+  stock: number;
+
   @ManyToOne(() => Category, (category) => category.products, {
     nullable: false,
     onDelete: 'RESTRICT',

@@ -12,9 +12,12 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/guards/roles.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { Role } from '../users/enums/role.enum';
 import { CreateProductDto } from './dto/create-product.dto';
 import { FindProductsQueryDto } from './dto/find-products-query.dto';
+import { StockMovementDto } from './dto/stock-movement.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductsService } from './products.service';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
@@ -38,6 +41,16 @@ export class ProductsController {
     return this.productsService.findAll(query);
   }
 
+  @Get(':id/stock/movements')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.Administrador, Role.Manager)
+  findMovementsByProduct(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() paginationQuery: PaginationQueryDto,
+  ) {
+    return this.productsService.findMovementsByProduct(id, paginationQuery);
+  }
+
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.productsService.findOne(id);
@@ -48,6 +61,17 @@ export class ProductsController {
   @Roles(Role.Administrador, Role.Manager)
   create(@Body() createProductDto: CreateProductDto) {
     return this.productsService.create(createProductDto);
+  }
+
+  @Patch(':id/stock')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.Administrador, Role.Manager)
+  registerStockMovement(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() stockMovementDto: StockMovementDto,
+  ) {
+    return this.productsService.registerStockMovement(id, stockMovementDto, user.id);
   }
 
   @Patch(':id')
