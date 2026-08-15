@@ -44,11 +44,8 @@ export class ProductsController {
   @Get(':id/stock/movements')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.Administrador, Role.Manager)
-  findMovementsByProduct(
-    @Param('id', ParseIntPipe) id: number,
-    @Query() paginationQuery: PaginationQueryDto,
-  ) {
-    return this.productsService.findMovementsByProduct(id, paginationQuery);
+  findMovementsByProduct(@Param('id', ParseIntPipe) id: number) {
+    return this.productsService.findMovementsByProduct(id);
   }
 
   @Get(':id')

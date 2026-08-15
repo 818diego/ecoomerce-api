@@ -242,30 +242,19 @@ export class ProductsService {
     return this.findById(id);
   }
 
-  async findMovementsByProduct(id: number, query: PaginationQueryDto) {
+  async findMovementsByProduct(id: number) {
     const product = await this.findById(id);
     if (!product) {
       throw new NotFoundException('Producto no encontrado');
     }
 
-    const { limit, skip, page } = query;
-    const [data, total] = await this.stockMovementsRepository.findAndCount({
+    const movements = await this.stockMovementsRepository.find({
       where: { productId: id },
       relations: { user: true },
       order: { createdAt: 'DESC' },
-      take: limit,
-      skip,
     });
 
-    return {
-      data: data.map((movement) => this.toSafeMovement(movement)),
-      meta: {
-        total,
-        page: page ?? 1,
-        lastPage: Math.ceil(total / (limit ?? 10)),
-        limit: limit ?? 10,
-      },
-    };
+    return movements.map((movement) => this.toSafeMovement(movement));
   }
 
   async registerStockMovement(
