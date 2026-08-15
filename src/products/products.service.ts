@@ -137,7 +137,7 @@ export class ProductsService {
     return product;
   }
 
-  async create(data: CreateProductDto) {
+  async create(data: CreateProductDto, userId: number) {
     const category = await this.categoriesRepository.findOne({
       where: { id: data.categoryId },
     });
@@ -165,20 +165,41 @@ export class ProductsService {
       }
     }
 
-    const product = this.productsRepository.create({
-      name: data.name,
-      slug,
-      description: data.description ?? null,
-      price: data.price,
-      sku,
-      imageUrl: data.imageUrl ?? null,
-      active: data.active ?? true,
-      stock: data.stock ?? 0,
-      category,
-    });
+    const initialStock = data.stock ?? 0;
 
-    const saved = await this.productsRepository.save(product);
-    return this.findById(saved.id);
+    return this.dataSource.transaction(async (manager) => {
+      const product = manager.create(Product, {
+        name: data.name,
+        slug,
+        description: data.description ?? null,
+        price: data.price,
+        sku,
+        imageUrl: data.imageUrl ?? null,
+        active: data.active ?? true,
+        stock: initialStock,
+        category,
+      });
+
+      const saved = await manager.save(Product, product);
+
+      if (initialStock > 0) {
+        const movement = manager.create(StockMovement, {
+          productId: saved.id,
+          userId,
+          type: StockMovementType.Inicial,
+          quantity: initialStock,
+          previousStock: 0,
+          newStock: initialStock,
+          observations: 'Stock inicial al crear producto',
+        });
+        await manager.save(StockMovement, movement);
+      }
+
+      return manager.findOne(Product, {
+        where: { id: saved.id },
+        relations: { category: true },
+      });
+    });
   }
 
   async update(id: number, data: UpdateProductDto) {
@@ -262,47 +283,46 @@ export class ProductsService {
     data: StockMovementDto,
     userId: number,
   ) {
-    const product = await this.findById(id);
-    if (!product) {
-      throw new NotFoundException('Producto no encontrado');
-    }
-
-    const previousStock = product.stock;
-    let newStock: number;
-
-    switch (data.type) {
-      case StockMovementType.Entrada:
-        if (data.quantity <= 0) {
-          throw new BadRequestException(
-            'La cantidad de una entrada debe ser mayor a 0',
-          );
-        }
-        newStock = previousStock + data.quantity;
-        break;
-
-      case StockMovementType.Salida:
-        if (data.quantity <= 0) {
-          throw new BadRequestException(
-            'La cantidad de una salida debe ser mayor a 0',
-          );
-        }
-        if (previousStock < data.quantity) {
-          throw new BadRequestException(
-            'Stock insuficiente para realizar la salida',
-          );
-        }
-        newStock = previousStock - data.quantity;
-        break;
-
-      case StockMovementType.Ajuste:
-        newStock = data.quantity;
-        break;
-
-      default:
-        throw new BadRequestException('Tipo de movimiento no válido');
-    }
-
     return this.dataSource.transaction(async (manager) => {
+      const product = await manager.findOne(Product, {
+        where: { id },
+        relations: { category: true },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!product) {
+        throw new NotFoundException('Producto no encontrado');
+      }
+
+      const previousStock = product.stock;
+      let newStock: number;
+      let movementQuantity: number;
+
+      switch (data.type) {
+        case StockMovementType.Entrada:
+          newStock = previousStock + data.quantity!;
+          movementQuantity = data.quantity!;
+          break;
+
+        case StockMovementType.Salida:
+          if (previousStock < data.quantity!) {
+            throw new BadRequestException(
+              'Stock insuficiente para realizar la salida',
+            );
+          }
+          newStock = previousStock - data.quantity!;
+          movementQuantity = data.quantity!;
+          break;
+
+        case StockMovementType.Ajuste:
+          newStock = data.newStock!;
+          movementQuantity = Math.abs(newStock - previousStock);
+          break;
+
+        default:
+          throw new BadRequestException('Tipo de movimiento no válido');
+      }
+
       product.stock = newStock;
       await manager.save(Product, product);
 
@@ -310,7 +330,7 @@ export class ProductsService {
         productId: product.id,
         userId,
         type: data.type,
-        quantity: data.quantity,
+        quantity: movementQuantity,
         previousStock,
         newStock,
         observations: data.observations?.trim() || null,

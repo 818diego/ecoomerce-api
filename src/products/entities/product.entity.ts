@@ -1,5 +1,6 @@
 import { Exclude } from 'class-transformer';
 import {
+  Check,
   Column,
   CreateDateColumn,
   Entity,
@@ -12,6 +13,7 @@ import {
 import { Category } from '../../categories/entities/category.entity';
 
 @Entity({ name: 'products' })
+@Check('stock >= 0')
 export class Product {
   @PrimaryGeneratedColumn()
   id: number;
